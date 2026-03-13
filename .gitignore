@@ -1,0 +1,33 @@
+# Go
+bin/
+foundry.exe
+foundry.test
+foundry.prof
+foundry.svg
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+podify/
+env/
+venv/
+ENV/
+*.env
+
+# Audio
+/tmp/foundry_*.wav
+/tmp/seg_*.wav
+/tmp/final_podcast.wav
+/tmp/segments_list.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project specific
+/foundry/foundry
+/python/podify
