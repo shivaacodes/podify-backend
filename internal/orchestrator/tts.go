@@ -136,7 +136,7 @@ func callTTS(ctx context.Context, seg DialogueSegment, language string) (string,
 
 	speaker := "shubh" // Male (Conversational)
 	if seg.Speaker == "Host B" {
-		speaker = "manan" // Male (Consistent)
+		speaker = "ritu" // Most natural female counterpart to shubh
 	}
 
 	langCode := "en-IN"
@@ -225,6 +225,32 @@ func StitchAudio(segments []AudioSegment) (string, error) {
 	cmd := exec.Command("ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", outputPath)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("ffmpeg failed: %w, output: %s", err, string(output))
+	}
+
+	return outputPath, nil
+}
+
+// MixBGM overlays a background music track with "ducking" and a professional "swell" at the end.
+func MixBGM(voicePath string, bgmPath string) (string, error) {
+	outputPath := "/tmp/final_podcast_with_bgm.wav"
+
+	// ffmpeg command for professional sidechain ducking + Catchy 2s Intro + High-energy End swell:
+	// 1. [0:a]adelay=2000|2000 -> Delays the voice by 2s (music alone first).
+	// 2. [voice_del]apad=pad_dur=4 -> Adds 4s silence to the end for a longer sign-off swell.
+	// 3. [1:a]volume=0.25 -> Catchy/loud music volume for intro/outro.
+	// 4. sidechaincompress -> Aggressively ducks the music during speech.
+	// 5. amix:duration=first -> Stops when the padded+delayed voice ends.
+	
+	cmd := exec.Command("ffmpeg", "-y", 
+		"-i", voicePath, 
+		"-i", bgmPath, 
+		"-filter_complex", "[0:a]adelay=2000|2000,apad=pad_dur=4[voice_pad];[1:a]volume=0.25[bgm_loud];[bgm_loud][voice_pad]sidechaincompress=threshold=0.01:ratio=20:level_sc=1:release=500[bgm_ducked];[voice_pad][bgm_ducked]amix=inputs=2:duration=first",
+		"-ac", "2",
+		outputPath,
+	)
+
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("ffmpeg mix failed: %w, output: %s", err, string(output))
 	}
 
 	return outputPath, nil

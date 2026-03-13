@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"foundry/internal/fetcher"
@@ -149,12 +150,22 @@ func Run(articleURL string, duration string, style string, language string) (*Pi
 		}
 
 		// 3. Stitch audio segments into final podcast
-		finalPath, err := StitchAudio(audioSegments)
+		voicePath, err := StitchAudio(audioSegments)
 		if err != nil {
 			return fmt.Errorf("stitch audio: %w", err)
 		}
 
-		result.AudioPath = finalPath
+		// 4. Mix with Background Music (if available)
+		bgmPath := "assets/bgm.mp3"
+		if _, err := os.Stat(bgmPath); err == nil {
+			finalPath, err := MixBGM(voicePath, bgmPath)
+			if err != nil {
+				return fmt.Errorf("mix bgm: %w", err)
+			}
+			result.AudioPath = finalPath
+		} else {
+			result.AudioPath = voicePath
+		}
 		return nil
 	})
 	if err != nil {
