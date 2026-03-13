@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
@@ -8,24 +9,29 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: foundry <article-url>")
-		fmt.Fprintln(os.Stderr, "example: foundry https://en.wikipedia.org/wiki/Podcast")
+	duration := flag.String("duration", "2 mins", "podcast duration (e.g., 1 min, 2 mins)")
+	style := flag.String("style", "conversational", "podcast style (e.g., conversational, entertaining)")
+	language := flag.String("lang", "english", "podcast language (e.g., english, malayalam)")
+	flag.Parse()
+
+	args := flag.Args()
+	if len(args) < 1 {
+		fmt.Println("Usage: foundry [flags] <article-url>")
 		os.Exit(1)
 	}
 
-	url := os.Args[1]
-	fmt.Printf("▶ Starting Foundry pipeline for: %s\n\n", url)
+	articleURL := args[0]
+	fmt.Printf("▶ Starting Foundry pipeline for: %s\n", articleURL)
+	fmt.Printf("  Options: duration=%s, style=%s, lang=%s\n", *duration, *style, *language)
 
-	result, err := orchestrator.Run(url)
+	result, err := orchestrator.Run(articleURL, *duration, *style, *language)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "pipeline error: %v\n", err)
+		fmt.Printf("\npipeline error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("\n── Result ─────────────────────────────\n")
+	fmt.Println("\n── Result ─────────────────────────────")
 	fmt.Printf("Article text length : %d chars\n", len(result.ArticleText))
-	fmt.Printf("Summary             : %s\n", result.Summary[:min(len(result.Summary), 120)])
 	fmt.Printf("Context sources     : %d\n", len(result.Context))
 	fmt.Printf("Script preview      :\n%s\n", result.Script)
 	fmt.Printf("Audio output path   : %s\n", result.AudioPath)

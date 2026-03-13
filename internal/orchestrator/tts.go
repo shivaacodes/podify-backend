@@ -87,7 +87,8 @@ func ParseDialogue(script string) []DialogueSegment {
 
 // GenerateAudioParallel fires one goroutine per segment,
 // collects results in index order, returns ordered AudioSegments.
-func GenerateAudioParallel(ctx context.Context, segments []DialogueSegment) ([]AudioSegment, error) {
+// GenerateAudioParallel handles parallel TTS generation.
+func GenerateAudioParallel(ctx context.Context, segments []DialogueSegment, language string) ([]AudioSegment, error) {
 	// Pre-allocate result slice at full size.
 	// Each goroutine writes to its own index — no mutex needed.
 	results := make([]AudioSegment, len(segments))
@@ -97,7 +98,7 @@ func GenerateAudioParallel(ctx context.Context, segments []DialogueSegment) ([]A
 	for _, seg := range segments {
 		seg := seg // capture
 		g.Go(func() error {
-			path, err := callTTS(ctx, seg)
+			path, err := callTTS(ctx, seg, language)
 			if err != nil {
 				return fmt.Errorf("TTS segment %d (%s): %w", seg.Index, seg.Speaker, err)
 			}
@@ -113,7 +114,6 @@ func GenerateAudioParallel(ctx context.Context, segments []DialogueSegment) ([]A
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
-
 	return results, nil
 }
 
@@ -130,18 +130,28 @@ type sarvamTTSResponse struct {
 }
 
 // callTTS calls Sarvam BulBul V3 for one segment.
-func callTTS(ctx context.Context, seg DialogueSegment) (string, error) {
+func callTTS(ctx context.Context, seg DialogueSegment, language string) (string, error) {
 	apiKey := "YOUR_SARVAM_API_KEY_HERE"
 	url := "https://api.sarvam.ai/text-to-speech"
 
-	speaker := "shubh" // Default for Host A
+	speaker := "shubh" // Male (Conversational)
 	if seg.Speaker == "Host B" {
-		speaker = "ritu" // Default for Host B
+		speaker = "manan" // Male (Consistent)
 	}
 
-	reqBody := sarvamTTSRequest{
+	langCode := "en-IN"
+	if strings.ToLower(language) == "malayalam" {
+		langCode = "ml-IN"
+	}
+
+	reqBody := struct {
+		Inputs             []string `json:"inputs"`
+		TargetLanguageCode string   `json:"target_language_code"`
+		Speaker            string   `json:"speaker"`
+		Model              string   `json:"model"`
+	}{
 		Inputs:             []string{seg.Text},
-		TargetLanguageCode: "en-IN",
+		TargetLanguageCode: langCode,
 		Speaker:            speaker,
 		Model:              "bulbul:v3",
 	}

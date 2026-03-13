@@ -32,9 +32,7 @@ type PipelineResult struct {
 }
 
 // Run executes the full Phase 1 pipeline.
-// Real: FetchHTML, ExtractText
-// Fake/stubbed: Summary, Context scraping, LLM script, TTS audio
-func Run(articleURL string) (*PipelineResult, error) {
+func Run(articleURL string, duration string, style string, language string) (*PipelineResult, error) {
 	log := logger.New()
 	result := &PipelineResult{}
 
@@ -125,7 +123,7 @@ func Run(articleURL string) (*PipelineResult, error) {
 
 	// ── Stage 4: Generate podcast script (STUB → Phase 3: Python HTTP call) ──
 	err = log.Track("generate_script", func() error {
-		script, err := callPythonScriptService(result.Summary, result.Context)
+		script, err := callPythonScriptService(result.Summary, result.Context, duration, style, language)
 		if err != nil {
 			return err
 		}
@@ -145,7 +143,7 @@ func Run(articleURL string) (*PipelineResult, error) {
 		}
 
 		// 2. Generate audio segments in parallel
-		audioSegments, err := GenerateAudioParallel(context.Background(), segments)
+		audioSegments, err := GenerateAudioParallel(context.Background(), segments, language)
 		if err != nil {
 			return fmt.Errorf("generate parallel audio: %w", err)
 		}
@@ -170,20 +168,26 @@ func Run(articleURL string) (*PipelineResult, error) {
 // ── Service Integration ──────────────────────────────────────────────────────
 
 type ScriptRequest struct {
-	Summary string            `json:"summary"`
-	Context map[string]string `json:"context"`
+	Summary  string            `json:"summary"`
+	Context  map[string]string `json:"context"`
+	Duration string            `json:"duration"`
+	Style    string            `json:"style"`
+	Language string            `json:"language"`
 }
 
 type ScriptResponse struct {
 	Script string `json:"script"`
 }
 
-func callPythonScriptService(summary string, context map[string]string) (string, error) {
+func callPythonScriptService(summary string, context map[string]string, duration string, style string, language string) (string, error) {
 	url := "http://localhost:8000/generate-script"
 
 	reqBody, err := json.Marshal(ScriptRequest{
-		Summary: summary,
-		Context: context,
+		Summary:  summary,
+		Context:  context,
+		Duration: duration,
+		Style:    style,
+		Language: language,
 	})
 	if err != nil {
 		return "", fmt.Errorf("marshal request: %w", err)
@@ -191,7 +195,7 @@ func callPythonScriptService(summary string, context map[string]string) (string,
 
 	// Create a client with timeout
 	client := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: 60 * time.Second, // Increased timeout for real LLM
 	}
 
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(reqBody))
